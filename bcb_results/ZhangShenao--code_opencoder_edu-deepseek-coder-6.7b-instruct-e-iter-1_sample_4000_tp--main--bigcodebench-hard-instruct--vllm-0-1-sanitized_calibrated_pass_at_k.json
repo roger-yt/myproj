@@ -1,0 +1,9 @@
+{
+  "pass@1": 0.12162162162162163,
+  "model": "ZhangShenao--code_opencoder_edu-deepseek-coder-6.7b-instruct-e-iter-1_sample_4000_tp--main",
+  "split": "instruct",
+  "subset": "hard",
+  "calibrated": true,
+  "gt_pass_rate": 1.0,
+  "failed_tasks": []
+}

@@ -76,7 +76,7 @@ class ScriptArguments:
         metadata={"help": "Which attention implementation to use"},
     )
     Task_Type: Optional[str] = field(
-        default="math_gsm",
+        default="math_metamath",
         metadata={"help": "math or code"},
     )
 

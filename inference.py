@@ -38,11 +38,6 @@ def parse_args():
         "--dataset_fraction",
         type=str
     )
-    parser.add_argument(
-        "--max_length",
-        type=int,
-        default=512
-    )
     parser.add_argument("--for_sft", action='store_true')
     return parser.parse_args()
 
@@ -95,7 +90,7 @@ if __name__ == "__main__":
         top_p=1.0,
         top_k=-1,
         seed=42,
-        max_tokens=args.max_length,
+        max_tokens=512,
         min_tokens=50,
         n=1,
         # frequency_penalty=1.0,

@@ -31,7 +31,7 @@ from utils import regularized_logp
 from torch.utils.tensorboard import SummaryWriter
 from transformers import DataCollatorWithPadding
 import subprocess
-
+#import wandb
 #import lm_eval
 from peft import LoraConfig, TaskType, get_peft_model
 from tqdm import tqdm
@@ -185,7 +185,7 @@ def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, y_rightpad):
         # Designing mask: only consider the tokens after "The answer is"
         xz_length = tokenizer(xz_txt, return_tensors='pt')['input_ids'].shape[1]
         prompt_length = xz_length + 4
-        assert y_txt.startswith('The answer is')
+        #assert y_txt.startswith('The answer is')
         # TODO: The length is approximate and may not be correct, so the assert below may fail... just ignoring it for now.
         # assert tokenizer.decode(concat_toks['input_ids'][0][xz_length:prompt_length]) == 'The answer is', [tokenizer.decode(concat_toks['input_ids'][0][xz_length:prompt_length])]
         output = ref_model.forward(concat_toks['input_ids'].to(ref_model.device), attention_mask=concat_toks['attention_mask'].to(ref_model.device))

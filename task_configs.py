@@ -40,14 +40,14 @@ class Config_Math_GSM(Config_Math):
             #tokenized_q = tokenizer(self.few_shot_cot_prompt + sample['query'], truncation=True)
             input = [{"role": "user", "content": sample['question']}]
             q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            tokenized_q = tokenizer.apply_chat_template(input, tokenize=True, add_generation_prompt=True, truncation=True)
+            tokenized_q = tokenizer(q, truncation=True)
             answer_text = sample['answer'].split('####')[-1].strip()
             answer = f"The answer is {answer_text}."
             input_answer = [{"role": "user", "content": sample['question']}, {"role": "assistant", "content": answer}]
             answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
             tokenized_a = tokenizer(answer, truncation=True)
-            sample["input_ids_q"] = tokenized_q
-            sample["attention_mask_q"] = [1 for _ in range(len(tokenized_q))]
+            sample["input_ids_q"] = tokenized_q["input_ids"]
+            sample["attention_mask_q"] = tokenized_q["attention_mask"]
             sample["input_ids_a"] = tokenized_a["input_ids"]
             sample["attention_mask_a"] = tokenized_a["attention_mask"]
             return sample
@@ -63,28 +63,6 @@ class Config_Math_GSM(Config_Math):
             answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
             sample["template_question"] = q
             sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            hint_input = [{"role": "user", "content": sample['question'] + " "+ sample["answer"]+ " " +"Answer:"}]
-            hint_q = tokenizer.apply_chat_template(hint_input, tokenize=False, add_generation_prompt=True)
-            sample["hint_template_question"] = hint_q
-            return sample
-        return tokenize
-    def inference_new_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
-            sample_x = instruction + " " + sample['question']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            answer_text = sample['answer'].split('####')[-1].strip()
-            answer = f"The answer is {answer_text}."
-            input_answer = [{"role": "user", "content": sample_x}, {"role": "assistant", "content": answer}]
-            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
-            sample["template_question"] = q
-            sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            hint_input = [{"role": "user", "content": sample_x + " "+ sample["answer"]+ " " +"Answer:"}]
-            hint_q = tokenizer.apply_chat_template(hint_input, tokenize=False, add_generation_prompt=True)
-            sample["hint_template_question"] = hint_q
             return sample
         return tokenize
     def sft_tokenize(self, tokenizer):
@@ -94,23 +72,71 @@ class Config_Math_GSM(Config_Math):
             sample["question"] = q
             return sample
         return tokenize
-    def sft_new_tokenize(self, tokenizer):
+    def m_sft_tokenize(self, tokenizer):
         def tokenize(sample):
-            instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
-            sample_x = instruction + " " + sample['question']
-            input = [{"role": "user", "content": sample_x}]
+            input = [{"role": "user", "content": sample['question']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            sample["question"] = q
+            sample["text"]= q+sample["rational_answer"]
+            return sample
+        return tokenize
+
+
+class Config_Math_MetaMath(Config_Math):
+    def __init__(self):
+        super(Config_Math_MetaMath, self).__init__()
+        self.x_colname = "query"
+        self.y_colname = "response"
+
+
+    def tokenize_E(self, tokenizer):
+        def tokenize(sample):
+            #tokenized_q = tokenizer(self.few_shot_cot_prompt + sample['query'], truncation=True)
+            input = [{"role": "user", "content": sample['query']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            tokenized_q = tokenizer(q, truncation=True)
+            answer_text = sample['response'].split('The answer is: ')[-1].strip()
+            answer = f"The answer is {answer_text}."
+            input_answer = [{"role": "user", "content": sample['query']}, {"role": "assistant", "content": answer}]
+            # print(tokenized_q, tokenizer.apply_chat_template(input_answer, tokenize=True))
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
+            tokenized_a = tokenizer(answer, truncation=True)
+            sample["input_ids_q"] = tokenized_q["input_ids"]
+            sample["attention_mask_q"] = tokenized_q["attention_mask"]
+            sample["input_ids_a"] = tokenized_a["input_ids"]
+            sample["attention_mask_a"] = tokenized_a["attention_mask"]
+            return sample
+        return tokenize
+
+    def inference_tokenize(self, tokenizer):
+        def tokenize(sample):
+            input = [{"role": "user", "content": sample['query']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            answer_text = sample['response'].split("The answer is ")[-1].strip()
+            answer = f"The answer is {answer_text}."
+            input_answer = [{"role": "user", "content": sample['query']}, {"role": "assistant", "content": answer}]
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
+            sample["template_question"] = q
+            sample["answer_text"] = answer
+            return sample
+        return tokenize
+    
+    def sft_tokenize(self, tokenizer):
+        def tokenize(sample):
+            input = [{"role": "user", "content": sample['question']}]
             q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
             sample["question"] = q
             return sample
         return tokenize
     def m_sft_tokenize(self, tokenizer):
         def tokenize(sample):
-            input = [{"role": "user", "content": sample["question"]}]
+            input = [{"role": "user", "content": sample['question']}]
             q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
             sample["question"] = q
             sample["text"]= q+sample["rational_answer"]
             return sample
         return tokenize
+
 
 class Config_Math_Math(Config_Math):
     def __init__(self):
@@ -157,7 +183,7 @@ class Config_Math_Math(Config_Math):
         def tokenize(sample):
             input = [{"role": "user", "content": sample['problem']}]
             q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            tokenized_q = tokenizer.apply_chat_template(input, tokenize=True, add_generation_prompt=True, truncation=True)
+            tokenized_q = tokenizer(q, truncation=True)
             # print("begin")
             answer_text = self.extract_boxed_content(sample['solution'])
             # print("end")
@@ -172,8 +198,8 @@ class Config_Math_Math(Config_Math):
             input_answer = [{"role": "user", "content": sample['problem']}, {"role": "assistant", "content": answer}]
             answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
             tokenized_a = tokenizer(answer, truncation=True)
-            sample["input_ids_q"] = tokenized_q
-            sample["attention_mask_q"] = [1 for _ in range(len(tokenized_q))]
+            sample["input_ids_q"] = tokenized_q["input_ids"]
+            sample["attention_mask_q"] = tokenized_q["attention_mask"]
             sample["input_ids_a"] = tokenized_a["input_ids"]
             sample["attention_mask_a"] = tokenized_a["attention_mask"]
             return sample
@@ -189,54 +215,6 @@ class Config_Math_Math(Config_Math):
             answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
             sample["template_question"] = q
             sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            return sample
-        return tokenize
-    def inference_new_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
-            sample_x = instruction + " " + sample['problem']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            answer_text = self.extract_boxed_content(sample['solution'])
-            answer = f"The answer is {answer_text}."
-            input_answer = [{"role": "user", "content": sample_x}, {"role": "assistant", "content": answer}]
-            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
-            sample["template_question"] = q
-            sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            return sample
-        return tokenize
-    
-    def inference_newb_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please reason step by step, and put your final answer after \"The answer is \"."
-            sample_x = instruction + " " + sample['problem']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            answer_text = self.extract_boxed_content(sample['solution'])
-            answer = f"The answer is {answer_text}."
-            input_answer = [{"role": "user", "content": sample_x}, {"role": "assistant", "content": answer}]
-            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
-            sample["template_question"] = q
-            sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            return sample
-        return tokenize
-    
-    def inference_myans_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please show your reasoning step by step. In the end, clearly state your final answer."
-            sample_x = instruction + " " + sample['problem']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            answer_text = self.extract_boxed_content(sample['solution'])
-            answer = f"The answer is {answer_text}."
-            input_answer = [{"role": "user", "content": sample_x}, {"role": "assistant", "content": answer}]
-            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
-            sample["template_question"] = q
-            sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
             return sample
         return tokenize
     
@@ -247,36 +225,6 @@ class Config_Math_Math(Config_Math):
             sample["question"] = q
             return sample
         return tokenize
-    
-    def sft_new_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
-            sample_x = instruction + " " + sample['question']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            sample["question"] = q
-            return sample
-        return tokenize
-    
-    def sft_newb_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction =  "Please reason step by step, and put your final answer after \"The answer is \"."
-            sample_x = instruction + " " + sample['question']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            sample["question"] = q
-            return sample
-        return tokenize
-    def sft_myans_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction =  "Please show your reasoning step by step. In the end, clearly state your final answer."
-            sample_x = instruction + " " + sample['question']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            sample["question"] = q
-            return sample
-        return tokenize
-
     def m_sft_tokenize(self, tokenizer):
         def tokenize(sample):
             input = [{"role": "user", "content": sample['question']}]
@@ -301,15 +249,77 @@ class Config_Code(Config_Math):
 class Config_Code_Opencoder_edu(Config_Code):
     def __init__(self):
         super(Config_Code_Opencoder_edu, self).__init__()
+        self.x_colname = "instruction"
+        self.y_colname = "output"
         with open(self.prompt_path, "r") as file:
             # Read the content of the file
             self.few_shot_cot_prompt = file.read()
-
+    """
     def tokenize_E(self, tokenizer):
         def tokenize(sample):
-            tokenized_q = tokenizer(self.few_shot_cot_prompt + sample[self.x_colname], truncation=True)
+            input = [{"role": "user", "content": sample['problem']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            tokenized_q = tokenizer(q, truncation=True)
+            # print("begin")
+            answer_text = self.extract_boxed_content(sample['solution'])
+            # print("end")
+            # print("solution=", sample['solution'])
+            # print("answer_text=", answer_text)
+            try:
+                answer = f"The answer is {answer_text}."
+            except Exception as e:
+                print("error=", e)
+                print("sample=", sample)
+                print("answer_text=", answer_text)
+            input_answer = [{"role": "user", "content": sample['problem']}, {"role": "assistant", "content": answer}]
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
+            tokenized_a = tokenizer(answer, truncation=True)
+            sample["input_ids_q"] = tokenized_q["input_ids"]
+            sample["attention_mask_q"] = tokenized_q["attention_mask"]
+            sample["input_ids_a"] = tokenized_a["input_ids"]
+            sample["attention_mask_a"] = tokenized_a["attention_mask"]
+            return sample
+        return tokenize
+
+    def inference_tokenize(self, tokenizer):
+        def tokenize(sample):
+            input = [{"role": "user", "content": sample['problem']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            answer_text = self.extract_boxed_content(sample['solution'])
+            answer = f"The answer is {answer_text}."
+            input_answer = [{"role": "user", "content": sample['problem']}, {"role": "assistant", "content": answer}]
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
+            sample["template_question"] = q
+            sample["answer_text"] = answer
+            return sample
+        return tokenize
+    
+    def sft_tokenize(self, tokenizer):
+        def tokenize(sample):
+            input = [{"role": "user", "content": sample['question']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            sample["question"] = q
+            return sample
+        return tokenize
+    def m_sft_tokenize(self, tokenizer):
+        def tokenize(sample):
+            input = [{"role": "user", "content": sample['question']}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            sample["question"] = q
+            sample["text"]= q+sample["rational_answer"]
+            return sample
+        return tokenize
+    """
+    def tokenize_E(self, tokenizer):
+        def tokenize(sample):
+            input_str = self.few_shot_cot_prompt + sample[self.x_colname]
+            input = [{"role": "user", "content": input_str}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            tokenized_q = tokenizer(q, truncation=True)
             answer_text = sample[self.y_colname].strip()
             answer = f"[Implementation]\n{answer_text}."
+            input_answer = [{"role": "user", "content": input_str}, {"role": "assistant", "content": answer}]
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
             tokenized_a = tokenizer(answer, truncation=True)
             sample["input_ids_q"] = tokenized_q["input_ids"]
             sample["attention_mask_q"] = tokenized_q["attention_mask"]
@@ -319,37 +329,64 @@ class Config_Code_Opencoder_edu(Config_Code):
 
         return tokenize
 
-    def inference_tokenize(self):
+    def inference_tokenize(self, tokenizer):
         def tokenize(sample):
+            input_str = self.few_shot_cot_prompt + sample[self.x_colname]
+            input = [{"role": "user", "content": input_str}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            
             answer_text = sample[self.y_colname].strip()
-            sample["few_shot_cot_question"] = self.few_shot_cot_prompt + sample[self.x_colname]
-            sample["answer_text"] = f"[Implementation]\n{answer_text}."
+            answer = f"[Implementation]\n{answer_text}."
+            input_answer = [{"role": "user", "content": input_str}, {"role": "assistant", "content": answer}]
+            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
+            sample["template_question"] = q
+            sample["answer_text"] = answer
             return sample
 
         return tokenize
-
-    def M_sft_cot_prefix(self):
-        """
-        recall that we save the inference dataset as follows:
-        tmp_data = {"question": dataset_[i][task_config.x_colname], "answer": dataset_[i][task_config.y_colname],
-            "rational_answer": rational_answer[i]}
-        Here:  rational_answer == cat(z,y)
+    def sft_tokenize(self, tokenizer):
         """
 
-        def cot_prefix(sample):
-            sample["text"] = '### Instruction\n' + sample["question"] + '### Response\n[Reasoning]\n' + sample[
-                "rational_answer"]  ##+ '[Implementation]\n' + sample["answer"]
+    the colnames of x, y, z are changed after inference.py
+        """
+        def tokenize(sample):
+            input_str = sample['question']
+            input = [{"role": "user", "content": input_str}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            sample["question"] = q
             return sample
-
-        return cot_prefix
-
-    def baseline_sft_cot_prefix(self):
-        def cot_prefix(sample):
-            sample["text"] = '### Instruction\n' + sample[self.x_colname] + '### Response\n[Implementation]\n' + sample[
-                self.y_colname]
+        return tokenize
+    def m_sft_tokenize(self, tokenizer):
+        """
+        def tokenize(sample):
+            input_str = sample['question']
+            input = [{"role": "user", "content": input_str}]
+            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
+            sample["question"] = q
+            sample["text"]= q+sample["rational_answer"]
             return sample
+        """
+        x_label="question"
+        y_label="rational_answer"
+        def tokenize(batch):
+        # 将 prompt 和 response 拼接
+            inputs = [p + r for p, r in zip(batch[x_label], batch[y_label])]
+            # 使用分词器处理输入
+            tokenized_inputs = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
 
-        return cot_prefix
+            # 创建 labels
+            labels = tokenized_inputs["input_ids"].clone()  # 复制 input_ids 作为 labels
+            for i, (prompt, response) in enumerate(zip(batch[x_label], batch[y_label])):
+                # 找到 prompt 的 token 长度
+                prompt_tokens = tokenizer(prompt, return_tensors="pt")["input_ids"][0]
+                prompt_length = len(prompt_tokens)
+                # 将 prompt 部分的 labels 设置为 -100（忽略）
+                labels[i, :prompt_length] = -100
+
+            tokenized_inputs["labels"] = labels
+            return tokenized_inputs
+        return tokenize
+
 
 
 def task_config_check(task_name):
@@ -359,9 +396,10 @@ def task_config_check(task_name):
         return Config_Math_MetaMath()
     elif task_name.startswith("math_math"):
         return Config_Math_Math()
-    elif task_name == "code_opencoder_edu":
+    elif "code_opencoder_edu" in task_name:
         return Config_Code_Opencoder_edu()
-
+    else:
+        raise(NotImplementedError)
 
 def task_data_set(task_name):
     if "math_gsm" in task_name:
@@ -377,21 +415,31 @@ def task_data_set(task_name):
             data = data.select(range(sp[0], min(sp[1], data_length)))
         return train_set_path, data
     if "math_math" in task_name:
-        train_set_path = "ZhangShenao/MATH_chat"
+        train_set_path = "lighteval/MATH"
         split = task_name.split("math_math")[-1]
         if split == "":
-            data = load_dataset(train_set_path)["train"]
-            print("data_length=", len(data))
+            data = load_dataset(train_set_path, "all")["train"]
         else:
             sp = [0 if i=='' else int(i) for i in split.strip("[]").split(":")]
-            data = load_dataset(train_set_path)["train"]
+            data = load_dataset(train_set_path, "all")["train"]
             data_length = len(data)
             assert sp[0] < data_length
             data = data.select(range(sp[0], min(sp[1], data_length)))
         return train_set_path, data
-    elif task_name == "code_opencoder_edu":
+    elif "code_opencoder_edu" in task_name:
+
         train_set_path = "OpenCoder-LLM/opc-sft-stage2"
-        return train_set_path, load_dataset(train_set_path, "educational_instruct")["train"]
+        split = task_name.split("code_opencoder_edu")[-1]
+        if split == "":
+            data = load_dataset(train_set_path, "educational_instruct")["train"]
+        else:
+            sp = [0 if i=='' else int(i) for i in split.strip("[]").split(":")]
+            data = load_dataset(train_set_path, "educational_instruct")["train"]
+            data_length = len(data)
+            assert sp[0] < data_length
+            data = data.select(range(sp[0], min(sp[1], data_length)))
+        return train_set_path, data
+        
 
 def get_stoppings(model_name, tokenizer):
     stop_strings = []
@@ -399,30 +447,15 @@ def get_stoppings(model_name, tokenizer):
         stop_strings = ["<|eot_id|>"]
     elif "mistral" in model_name.lower():
         stop_strings = ["</s>"]
-    elif "gemma-1.1" in model_name.lower():
+    elif "gemma" in model_name.lower():
         stop_strings = ["<eos>"]
-    elif "gemma-2" in model_name.lower():
-        stop_strings = ["<end_of_turn>"]
-    elif "qwen" in model_name.lower():
-        stop_strings = ["<|im_end|>"]
+    elif "deepseek-coder" in model_name.lower():
+        stop_string = ["<|EOT|>", "[Implementation]", "```python"]
+    else:
+        print(model_name.lower())
+        raise(ValueError)
     stop_tokens = []
     for stop_string in stop_strings:
         stop_tokens += tokenizer(stop_string)["input_ids"]
     return stop_strings, stop_tokens
 
-def get_stoppings_new(model_name, tokenizer):
-    stop_strings = []
-    if "llama" in model_name.lower():
-        stop_strings = ["<|eot_id|>"]
-    elif "mistral" in model_name.lower():
-        stop_strings = ["</s>"]
-    elif "gemma-1.1" in model_name.lower():
-        stop_strings = ["<eos>", "<bos>"]
-    elif "gemma-2" in model_name.lower():
-        stop_strings = ["<end_of_turn>"]
-    elif "qwen" in model_name.lower():
-        stop_strings = ["<|im_end|>"]
-    stop_tokens = []
-    for stop_string in stop_strings:
-        stop_tokens += tokenizer(stop_string)["input_ids"]
-    return stop_strings, stop_tokens

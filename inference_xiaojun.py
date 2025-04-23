@@ -38,11 +38,6 @@ def parse_args():
         default="math_gsm",
         help= "math or code",
     )
-    parser.add_argument(
-        "--model_max_length",
-        type=int,
-        default=512
-    )
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--train_step", type=int, default=999999)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
@@ -60,7 +55,6 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_path) #AutoTokenizer
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.model_max_length = args.model_max_length
 
     column_names = list(train_dataset.features)
     task_config = task_config_check(args.task_type)
@@ -148,6 +142,7 @@ def main(args):
     else:
         raise NotImplementedError()
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=MyDataCollatorWithPadding(tokenizer=tokenizer, padding=True))
+
     train_steps = min(args.train_step, len(train_dataloader))
 
     model_config = AutoConfig.from_pretrained(args.model_path)

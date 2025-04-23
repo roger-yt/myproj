@@ -43,7 +43,7 @@ class ScriptArguments:
     qmodel_name: Optional[str] = field(default="google/gemma-2-2b-it")
     out_path: Optional[str] = field(default="./out.txt")
     task_type: Optional[str] = field(default="math_gsm")
-    max_length: Optional[int] = field(default=512)
+    max_length: Optional[int] = field(default=256)
 
 def padding_func(ft_ls, padding_side, pad_token_id, return_tensors):
     max_len = max(len(ft) for ft in ft_ls)
@@ -109,13 +109,7 @@ def calc_all_metrics(ref_model, tokenizer, xz_leftpad, y_rightpad):
         output = ref_model.forward(concat_toks['input_ids'].to(ref_model.device), attention_mask=concat_toks['attention_mask'].to(ref_model.device))
         if output.logits.shape[1] <= prompt_length:
             prompt_length = output.logits.shape[1] - 1
-        print("concat_toks['input_ids'].shape[1]-prompt_length=", concat_toks['input_ids'].shape[1]-prompt_length)
-        print("output.logits.shape[1]=", output.logits.shape[1])
-        print("prompt_length=", prompt_length)
-        print("xz_txt=", xz_txt)
-        print(concat_toks['input_ids'].size(), y_txt)
         print("kept_str=", tokenizer.decode(concat_toks['input_ids'][0][prompt_length-1:]))
-
         shift_logits = output.logits[:,prompt_length-1:-1]
         shift_labels = concat_toks['input_ids'][:,prompt_length:].to(ref_model.device)
         full_nll = loss_fn(shift_logits.view(concat_toks['input_ids'].shape[1]-prompt_length,-1), shift_labels.view(concat_toks['input_ids'].shape[1]-prompt_length))
@@ -134,24 +128,11 @@ def calc_all_metrics(ref_model, tokenizer, xz_leftpad, y_rightpad):
             gen_txt = tokenizer.decode(seq[0], skip_special_tokens=True)
             true_ans = y_txt[len('The answer is'):-1] # remove the final period
             gen_ans = gen_txt[len(xz_txt+'The answer is'):][:len(true_ans)]
-            true_ans = true_ans[:len(gen_ans)]
-            print("true_ans=", true_ans)
-            print("gen_ans=", gen_ans)
-            # print("gen_txt=", gen_txt)
             prompt_gen_acc = torch.FloatTensor([gen_ans==true_ans])
         metrics.append({'full_nll':full_nll, 'next_tok_logp':next_tok_logp, 'next_tok_acc':next_tok_acc, 'prompt_gen_acc':prompt_gen_acc})
 
     return metrics
-def calc_metric_result(all_metrics):
-    keys = [k for k in all_metrics[0]]
-    processed_metrics = {k:[] for k in keys}
-    for metric in all_metrics:
-        for k in keys:
-            processed_metrics[k].append(metric[k])
-    metric_results = {}
-    for k in keys:
-        metric_results[k] = torch.stack(processed_metrics[k]).mean()
-    return metric_results
+
 
 def main(script_args):
     DEVICE = "cuda:0"
@@ -198,9 +179,7 @@ def main(script_args):
                 seq_attention_mask[:,:prompt_length] = prompt_attention_mask
                 cur_metrics = calc_all_metrics(ref_model, tokenizer, seq, answer_input_ids)
             all_metrics.extend(cur_metrics)
-            if (step + 1)%1 == 0:
-                metric_results = calc_metric_result(all_metrics)
-                print (metric_results)
+            
             for one_seq in seq:
                 outf.write(tokenizer.decode(one_seq, skip_special_tokens=True)+"\n")
                 outf.write("================\n")
@@ -210,8 +189,15 @@ def main(script_args):
             #if step > 10:
             #    break
 
-        metric_results = calc_metric_result(all_metrics)
-        print(metric_results)
+        keys = [k for k in all_metrics[0]]
+        processed_metrics = {k:[] for k in keys}
+        for metric in all_metrics:
+            for k in keys:
+                processed_metrics[k].append(metric[k])
+        metric_results = {}
+        for k in keys:
+            metric_results[k] = torch.stack(processed_metrics[k]).mean()
+        print (metric_results)
         outf.write(str(metric_results))
 
 if __name__ == '__main__':

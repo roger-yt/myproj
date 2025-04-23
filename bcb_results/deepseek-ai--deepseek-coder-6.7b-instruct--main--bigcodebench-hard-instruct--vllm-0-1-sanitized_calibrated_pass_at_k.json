@@ -1,0 +1,9 @@
+{
+  "pass@1": 0.10135135135135136,
+  "model": "deepseek-ai--deepseek-coder-6.7b-instruct--main",
+  "split": "instruct",
+  "subset": "hard",
+  "calibrated": true,
+  "gt_pass_rate": 1.0,
+  "failed_tasks": []
+}

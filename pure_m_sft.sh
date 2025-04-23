@@ -1,5 +1,5 @@
 # source ~/.bashrc
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="2,3"
 #export WANDB_API_KEY=ee43df2d6680a9ce636f698eba4b5534c4336452
 #export HF_TOKEN=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
 #huggingface-cli login  --token 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
@@ -12,8 +12,8 @@ export CUDA_VISIBLE_DEVICES="0,1,2,3"
 #model_name="Mistral-7B-Instruct-v0.2"
 #company="mistralai"
 
-company="google"
-model_name="gemma-1.1-7b-it"
+company="meta-llama"
+model_name="Meta-Llama-3-8B-Instruct"
 critic_model_name="${company}/${model_name}"
 task_pre="math"
 task_suf="gsm"
@@ -21,7 +21,7 @@ task_suf="gsm"
 num_samples=7473
 path="./${model_name}-${task_suf}_sample_${num_samples}_tp"
 export HF_TOKEN=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
-train_epochs=10
+train_epochs=7
 
 conda activate yy
 mkdir $path

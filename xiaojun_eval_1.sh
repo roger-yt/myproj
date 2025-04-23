@@ -1,8 +1,8 @@
 task_pre="math"
-task_suf="math"
+task_suf="gsm"
 
 export HF_TOKEN=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
 CUDA_VISIBLE_DEVICES="1" python xiaojun_eval.py\
-    --pmodel_name "google/gemma-2-9b-it"\
-    --qmodel_name "google/gemma-2-9b-it" \
+    --pmodel_name "meta-llama/Meta-Llama-3-8B-Instruct"\
+    --qmodel_name "meta-llama/Meta-Llama-3-8B-Instruct" \
     --task_type "${task_pre}_${task_suf}" \
