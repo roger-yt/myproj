@@ -1,9 +1,0 @@
-{
-  "pass@1": 0.14864864864864866,
-  "model": "ZhangShenao--code_opencoder_edu-deepseek-coder-6.7b-instruct-rs-sample_4000_tp_gen30_temp1.0--main",
-  "split": "instruct",
-  "subset": "hard",
-  "calibrated": true,
-  "gt_pass_rate": 1.0,
-  "failed_tasks": []
-}

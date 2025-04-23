@@ -8,15 +8,12 @@ export HF_TOKEN=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
 #MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-1.3b-instruct-m-iter-1_sample_4000_tp"
 #MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-1.3b-instruct-sft-sample_4000_tp"
 MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-m-iter-1_sample_4000_tp"
-MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-rs-sample_4000_tp"
 #MODEL="ZhangShenao/code_opencoder_edu-Llama-3.1-8B-Instruct-sft-sample_4000_tp"
 #MODEL="meta-llama/Llama-3.1-8B-Instruct"
-MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-rs-sample_4000_tp_gen30_temp1.0"
 MODEL="deepseek-ai/deepseek-coder-6.7b-instruct"
-MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-rs-sample_4000_tp_gen1_temp1.0"
 #MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-sft-sample_4000_tp"
 DATA=humaneval
-CUDA_VISIBLE_DEVICES=1 evalplus.evaluate --model $MODEL \
+CUDA_VISIBLE_DEVICES=5 evalplus.evaluate --model $MODEL \
                   --dataset $DATA          \
                   --backend vllm                         \
                   --greedy
@@ -62,25 +59,17 @@ MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-e-iter-1_samp
 #MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-sft-sample_4000_tp"
 #MODEL="deepseek-ai/deepseek-coder-6.7b-instruct"
 export E2B_API_KEY="e2b_0a231fa3b0a2b01690ab6c66a23b55c0979ce4ee"
-MODEL="ZhangShenao/code_opencoder_edu-deepseek-coder-6.7b-instruct-rs-sample_4000_tp_gen30_temp1.0"
-CUDA_VISIBLE_DEVICES=5,6 bigcodebench.evaluate \
+
+CUDA_VISIBLE_DEVICES=8,9 bigcodebench.evaluate \
   --model ${MODEL} \
-  --execution gradio \
-  --split instruct \
-  --subset hard \
-  --backend vllm \
-  --gradio_endpoint https://richardodliu-bigcodebench-evaluator.hf.space/
-CUDA_VISIBLE_DEVICES=2,3 bigcodebench.evaluate \
-  --model ${MODEL} \
-  --execution gradio \
+  --execution e2b \
   --split instruct \
   --subset full \
-  --backend vllm \
-  --gradio_endpoint https://richardodliu-bigcodebench-evaluator.hf.space/
+  --backend vllm
+
 CUDA_VISIBLE_DEVICES=8 bigcodebench.evaluate \
   --samples generation-m1.jsonl \
-  --execution gradio \
+  --execution e2b \
   --split instruct \
-  --subset full \
-  --backend vllm \
-  --gradio_endpoint https://richardodliu-bigcodebench-evaluator.hf.space/
+  --subset hard \
+  --backend vllm
