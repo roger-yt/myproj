@@ -38,6 +38,10 @@ def parse_args():
         "--dataset_fraction",
         type=str
     )
+    parser.add_argument(
+        "--upload_token",
+        type=str
+    )
     parser.add_argument("--for_sft", action='store_true')
     return parser.parse_args()
 
@@ -130,4 +134,4 @@ if __name__ == "__main__":
     for index in [0,1,-1]:
         print(f"gathered_data[-1]:\n{gathered_data[-1]}")
     dataset = Dataset.from_list(gathered_data)
-    dataset.push_to_hub(args.dataset_path, private=False)
+    dataset.push_to_hub(args.dataset_path, private=False, token=args.upload_token)

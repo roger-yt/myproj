@@ -1,9 +1,11 @@
-# source ~/.bashrc
-git clone -b yutong_dev --single-branch https://github.com/YYT-t/xyzo.git
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-cd xyzo
-pip install pyyaml
-python pip_install_from_yaml.py
+# source ~/.bashrc
+git clone -b code --single-branch https://github.com/roger-yt/myproj.git
+cd myproj
+conda env create -f environment.yaml
+conda init bash
+conda activate yy
 
 iter_num=1
 #3
@@ -32,8 +34,10 @@ fi
 #5000
 sft_learning_rate="5e-5"
 path="./${model_name}-${task_suf}_sample_${num_samples}_tp"
+
 export HF_TOKEN=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
 
+upload_token=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
 
 for i in $(seq 1 $iter_num); do
     mkdir $path
@@ -42,7 +46,7 @@ for i in $(seq 1 $iter_num); do
     m_model_dir="${path}/m-iter-$i"
     e_hub_id="${task_pre}_${task_suf}-${model_name}-e-iter-${i}_sample_${num_samples}_tp"
     m_hub_id="${task_pre}_${task_suf}-${model_name}-m-iter-${i}_sample_${num_samples}_tp"
-    dataset_path="ZhangShenao/${task_pre}_${task_suf}-${model_name}-iter${i}_sample_${num_samples}_tp"
+    dataset_path="YYT-t/${task_pre}_${task_suf}-${model_name}-iter${i}_sample_${num_samples}_tp"
     if [ "$i" -eq 1 ]; then
         e_input_model="${company}/${model_name}"
     else
@@ -57,10 +61,10 @@ for i in $(seq 1 $iter_num); do
     fi
     python xiaojun_E_step_ent_PPO.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir 
     
-    huggingface-cli upload "ZhangShenao/$e_hub_id" "${e_model_dir}/final_checkpoint" --token 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
+    huggingface-cli upload "YYT-t/$e_hub_id" "${e_model_dir}/final_checkpoint" --token $upload_token
     
-    python inference_for_code.py --model_path "${e_model_dir}/final_checkpoint" --task_type "${task_pre}_${task_suf}" --dataset_path $dataset_path --dataset_fraction $split 
+    python inference_for_code.py --model_path "${e_model_dir}/final_checkpoint" --task_type "${task_pre}_${task_suf}" --dataset_path $dataset_path --dataset_fraction $split  --upload_token $upload_token
     python inference_xiaojun.py --model_path $e_input_model --dataset_path $dataset_path --save_prefix $m_model_dir --sft_data_type zq_raw --train_step $num_samples  --task_type  "${task_pre}_${task_suf}" --learning_rate $sft_learning_rate
-    huggingface-cli upload "ZhangShenao/$m_hub_id" "${m_model_dir}_zq_raw" --token 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
+    huggingface-cli upload "YYT-t/$m_hub_id" "${m_model_dir}_zq_raw" --token $upload_token
 
 done    
