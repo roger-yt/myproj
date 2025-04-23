@@ -5,6 +5,7 @@ git clone -b code --single-branch https://github.com/roger-yt/myproj.git
 cd myproj
 conda env create -f environment.yaml
 # conda init bash
+eval "$(conda shell.bash hook)"
 conda activate yy
 
 iter_num=1
