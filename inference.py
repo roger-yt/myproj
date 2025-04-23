@@ -43,6 +43,10 @@ def parse_args():
         type=int,
         default=512
     )
+    parser.add_argument(
+        "--upload_token",
+        type=str
+    )
     parser.add_argument("--for_sft", action='store_true')
     return parser.parse_args()
 
@@ -127,4 +131,4 @@ if __name__ == "__main__":
             gathered_data.append(tmp_data)
     print("gathered_data:", gathered_data)
     dataset = Dataset.from_list(gathered_data)
-    dataset.push_to_hub(args.dataset_path, private=False)
+    dataset.push_to_hub(args.dataset_path, private=False, token=args.upload_token)
