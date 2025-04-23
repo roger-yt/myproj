@@ -4,7 +4,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 git clone -b code --single-branch https://github.com/roger-yt/myproj.git
 cd myproj
 conda env create -f environment.yaml
-conda init bash
+# conda init bash
 conda activate yy
 
 iter_num=1
