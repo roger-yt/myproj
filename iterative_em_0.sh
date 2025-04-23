@@ -56,16 +56,17 @@ for i in $(seq 1 $iter_num); do
         echo "iteration $i"
     fi
 
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python xiaojun_E_step_ent_PPO_noskip.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff|| exit 1
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python xiaojun_E_step_ent_PPO_noskip.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff
     
+
     huggingface-cli upload "YYT-t/$e_hub_id" "${e_model_dir}/final_checkpoint" --token $upload_token
     huggingface-cli upload "YYT-t/$e_hub_id" "${e_model_dir}/tb_log" --token $upload_token
 
     
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python inference.py --model_path "${e_model_dir}/final_checkpoint" --task_type "${task_pre}_${task_suf}" --dataset_path $dataset_path --dataset_fraction $split  --max_length $max_length --upload_token $upload_token|| exit 1
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python inference.py --model_path "${e_model_dir}/final_checkpoint" --task_type "${task_pre}_${task_suf}" --dataset_path $dataset_path --dataset_fraction $split  --max_length $max_length --upload_token $upload_token
     # accelerate launch  m_sft.py --deepspeed deepspeed_configs/deepspeed_3.json --num_train_epochs 3 --model_name $e_input_model  --per_device_train_batch_size 8 --gradient_accumulation_steps 4 --train_set_path $dataset_path --output_dir $m_model_dir --hub_model_id $m_hub_id || exit 1
     # huggingface-cli upload "YYT-t/${m_hub_id}_msft" "${m_model_dir}/final_checkpoint" --token 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
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python inference_xiaojun.py --model_path $e_input_model --dataset_path $dataset_path --save_prefix $m_model_dir --sft_data_type zq_raw --train_step $num_samples  --task_type  "${task_pre}_${task_suf}" --model_max_length $model_max_length --learning_rate $m_lr|| exit 1
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python inference_xiaojun.py --model_path $e_input_model --dataset_path $dataset_path --save_prefix $m_model_dir --sft_data_type zq_raw --train_step $num_samples  --task_type  "${task_pre}_${task_suf}" --model_max_length $model_max_length --learning_rate $m_lr
     huggingface-cli upload "YYT-t/$m_hub_id" "${m_model_dir}_zq_raw" --token $upload_token
 
 done    
