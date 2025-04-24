@@ -377,7 +377,7 @@ def task_data_set(task_name):
             data = data.select(range(sp[0], min(sp[1], data_length)))
         return train_set_path, data
     if "math_math" in task_name:
-        train_set_path = "ZhangShenao/MATH_chat"
+        train_set_path = "YYT-t/MATH"
         split = task_name.split("math_math")[-1]
         if split == "":
             data = load_dataset(train_set_path)["train"]

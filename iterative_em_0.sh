@@ -1,6 +1,6 @@
 # source ~/.bashrc
-git clone -b math --single-branch https://github.com/roger-yt/myproj.git
-cd myproj
+# git clone -b math --single-branch https://github.com/roger-yt/myproj.git
+# cd myproj
 conda env create -f environment.yaml
 # conda init bash
 eval "$(conda shell.bash hook)"
@@ -22,7 +22,7 @@ if [ "$model_name" == "gemma-2-9b-it" ]; then
     critic_model_name="google/gemma-2-2b-it"
 fi
 task_pre="math"
-task_suf="gsm"
+task_suf="math"
 num_samples=7500
 max_length=512
 model_max_length=512
