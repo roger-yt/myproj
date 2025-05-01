@@ -377,6 +377,7 @@ def main(script_args):
                                     do_sample=True,
                                     stop_strings=stop_strings,
                                     tokenizer=tokenizer,
+                                    min_new_tokens=1
                                     )
                 for idx in range(len(seq[0])-1, -1, -1):
                     if not seq[0][idx] in stop_tokens:
@@ -388,6 +389,7 @@ def main(script_args):
                                     max_length=max_min_length,
                                     pad_token_id=tokenizer.pad_token_id,
                                     do_sample=True,
+                                    min_new_tokens=1
                                     )
             # print("seq=", seq)
             # print(tokenizer.decode(seq[0]))
