@@ -138,6 +138,11 @@ PROMPT_TEMPLATES = {
         "{output}",
         "\n\n",
     ),
+    "qwen":(
+        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{input}<|im_end|>\n<|im_start|>assistant\n",
+        "{output}",
+        "\n\n",
+    ),
     "qwen25-math-cot": (
         "<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{{}}.<|im_end|>\n"
         "<|im_start|>user\n{input}<|im_end|>\n"
@@ -156,8 +161,18 @@ PROMPT_TEMPLATES = {
         "{output}",
         "\n\n",
     ),
-     "mistral": (
+    "mistral": (
         "[INST] {input}[/INST] ",
+        "{output}",
+        "\n\n"
+    ),
+    "mistral_box": (
+        "[INST] Please reason step by step, and put your final answer within \\boxed{{}}. {input}[/INST] ",
+        "{output}",
+        "\n\n"
+    ),
+    "mistral_answer": (
+        "[INST] Please reason step by step, and put your final answer after \"The answer is \". {input}[/INST] ",
         "{output}",
         "\n\n"
     ),
@@ -165,6 +180,26 @@ PROMPT_TEMPLATES = {
             "Answer the question based on the following example:\nQuestion: Samantha’s last name has three fewer letters than Bobbie’s last name. If Bobbie took two letters off her last name, she would have a last name twice the length of Jamie’s. Jamie’s full name is Jamie Grey. How many letters are in Samantha’s last name? Answer: There are 4 letters in Jamie’s last name, so Bobbie’s name is 4*2 +2 = 10 letters long. Samantha’s last name is 3 letters shorter than Bobbie’s, so there are 10 - 3 = 7 letters in Samantha’s last name.\nThe answer is 7.\nQuestion:{input} Answer: ",
         "{output}",
         "\n\n",
+    ),
+    "llama-3-8b-it":(
+        "<|start_header_id|>user<|end_header_id|>\n\n{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "{output}",
+        "<|eot_id|>",
+    ),
+    "llama-3-8b-it_box":(
+        "<|start_header_id|>user<|end_header_id|>\n\nPlease reason step by step, and put your final answer within \\boxed{{}}. {input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "{output}",
+        "<|eot_id|>",
+    ),
+    "llama-3-8b-it_answer":(
+        "<|start_header_id|>user<|end_header_id|>\n\nPlease reason step by step, and put your final answer after \"The answer is \". {input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "{output}",
+        "<|eot_id|>",
+    ),
+    "llama-3.1-8b-it":(
+        "<|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 26 Jul 2024\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "{output}",
+        "<|eot_id|>"
     ),
     "gemma-1.1-7b-it":(
         "<bos><start_of_turn>user\n{input}<end_of_turn>\n<start_of_turn>model\n",
@@ -176,10 +211,10 @@ PROMPT_TEMPLATES = {
         "{output}",
         "<end_of_turn>"
     ),
-    "llama-3-8b-it":(
-        "<|start_header_id|>user<|end_header_id|>\n\n{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+    "gemma-1.1-7b-it_answer":(
+        "<bos><start_of_turn>user\nPlease reason step by step, and put your final answer after \"The answer is \". {input}<end_of_turn>\n<start_of_turn>model\n",
         "{output}",
-        "<|eot_id|>",
+        "<end_of_turn>"
     ),
     "numina": ("### Problem: {input}\n### Solution:", " {output}", "\n\n"),
 }
