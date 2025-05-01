@@ -171,18 +171,14 @@ class MyDataCollatorWithPadding:
         }
         return batch
 
-def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, xz_mask, y_rightpad, y_mask):
+def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, y_rightpad):
     loss_fn = torch.nn.CrossEntropyLoss()
     assert len(xz_leftpad) == len(y_rightpad)
     reward = []
-    for one_xz, one_xz_mask, one_y, one_y_mask in zip(xz_leftpad, xz_mask, y_rightpad, y_mask):
+    for one_xz, one_y in zip(xz_leftpad, y_rightpad):
         # TODO: calculating without batch for convenience; can batchify to accelerate
-        # xz_txt = tokenizer.decode(one_xz, skip_special_tokens=True)
-        masked_xz = one_xz[one_xz_mask==1]
-        xz_txt = tokenizer.decode(masked_xz, skip_special_tokens=False)
+        xz_txt = tokenizer.decode(one_xz, skip_special_tokens=True)
         y_txt = tokenizer.decode(one_y, skip_special_tokens=True)
-        # print("xz_leftpad=", xz_leftpad)
-        # print("xz_leftpad.shape=", xz_leftpad.shape)
         concat_toks = tokenizer(xz_txt+y_txt, return_tensors='pt')
 
         #prompt_length = xz_length
@@ -195,6 +191,7 @@ def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, xz_mask, y_rightpad, 
         output = ref_model.forward(concat_toks['input_ids'].to(ref_model.device), attention_mask=concat_toks['attention_mask'].to(ref_model.device))
         if output.logits.shape[1] <= prompt_length:
             prompt_length = output.logits.shape[1] - 1
+            
         print("concat_toks['input_ids'].shape[1]-prompt_length=", concat_toks['input_ids'].shape[1]-prompt_length)
         print("output.logits.shape[1]=", output.logits.shape[1])
         print("prompt_length=", prompt_length)
@@ -246,7 +243,7 @@ def critic_loss_fn(values, old_values, returns, mask):
         torch.max(vf_loss1, vf_loss2) * mask) / mask.sum()
     return vf_loss
 
-def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_score, logprobs, ref_logprobs, kl_ctl, ent_coeff):
+def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_score, logprobs, ref_logprobs, kl_ctl=0.1):
     rew_clip_val = 5.0
     gamma = 1.0
     lam = 0.95
@@ -265,6 +262,7 @@ def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_scor
             old_rewards[i,start:ends[i]][-1] += reward_clip[i].to(old_rewards.device)
             old_rewards[i,ends[i]:] = 0
             old_values[i,ends[i]:] = 0
+
         lastgaelam = 0
         advantages_reversed = []
         length = old_rewards.size()[-1]
@@ -283,25 +281,6 @@ def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_scor
     critic_model.train()
     value = critic_model.forward(input_ids=seq.to(critic_model.device), attention_mask=attention_mask.to(critic_model.device))[:, :-1]
     critic_loss = critic_loss_fn(value[:,start:], old_values[:,start:].to(critic_model.device), returns.to(critic_model.device), action_mask[:,start:].to(critic_model.device))
-    
-    prob = torch.softmax(actor_prob[:, :-1, :], dim=-1)
-    log_prob_ = torch.log(prob + 1e-10)  # keep it stable
-    # shape: [B, T, vocab] => entropies: [B, T]
-    entropies = -(prob * log_prob_).sum(dim=-1)
-    new_entropies = entropies[:, start:]
-    new_mask = action_mask[:, start:]
-    # You might want to ensure the mask is float
-    new_mask = new_mask.float()
-    # Weighted average of entropies
-    # If you prefer a simple mean across all tokens, do sum(...) / sum(...).
-    entropy_mean = (new_entropies * new_mask).sum() / (new_mask.sum() + 1e-8)
-
-    # The final bonus term: 
-    entropy_loss = - ent_coeff * entropy_mean
-    print("actor_loss=", actor_loss)
-    print("entropy_loss=", entropy_loss)
-    actor_loss = actor_loss + entropy_loss
-
     return actor_loss, critic_loss
 
 
@@ -343,7 +322,6 @@ def main(script_args):
         os.makedirs(output_name)
 
     train_dataset = train_dataset.map(task_config.tokenize_E(tokenizer), num_proc=16)
-    print("train_dataset[0]=", train_dataset[0])
     train_steps = len(train_dataset) // (script_args.per_device_train_batch_size * script_args.gradient_accumulation_steps)
 
     model_config = AutoConfig.from_pretrained(script_args.model_name)
@@ -386,7 +364,6 @@ def main(script_args):
         prompt_attention_mask = batch["attention_mask_q_l"]
         prompt_length = prompt_input_ids.shape[1]
         answer_input_ids = batch["input_ids_a_r"]
-        answer_attention_mask = batch["attention_mask_a_r"]
 
         model.eval()
         max_min_length = prompt_length + script_args.max_length
@@ -400,6 +377,7 @@ def main(script_args):
                                     do_sample=True,
                                     stop_strings=stop_strings,
                                     tokenizer=tokenizer,
+                                    min_new_tokens=1
                                     )
                 for idx in range(len(seq[0])-1, -1, -1):
                     if not seq[0][idx] in stop_tokens:
@@ -411,6 +389,7 @@ def main(script_args):
                                     max_length=max_min_length,
                                     pad_token_id=tokenizer.pad_token_id,
                                     do_sample=True,
+                                    min_new_tokens=1
                                     )
             # print("seq=", seq)
             # print(tokenizer.decode(seq[0]))
@@ -418,11 +397,7 @@ def main(script_args):
             seq_attention_mask[:,:prompt_length] = prompt_attention_mask
 
             # Evaluate reward and other info
-            reward_score = calc_reward_with_nll(ref_model, tokenizer, 
-                                                seq.to(ref_model.device), 
-                                                seq_attention_mask.to(ref_model.device), 
-                                                answer_input_ids.to(ref_model.device),
-                                                answer_attention_mask.to(ref_model.device))
+            reward_score = calc_reward_with_nll(ref_model, tokenizer, seq.to(ref_model.device), answer_input_ids.to(ref_model.device))
             print (reward_score)
             # TODO: hard-coded reward normalization here. May try other methods.
             #reward_score = (reward_score+4.5)*2
@@ -445,7 +420,7 @@ def main(script_args):
 
         # Calculate actor loss and critic loss with standard PPO
         model.train()
-        actor_loss, critic_loss = calc_PPO_loss(model, critic_model, seq, seq_attention_mask, prompt_input_ids, reward_score, logprobs, ref_logprobs, kl_ctl=0.1, ent_coeff = script_args.ent_coeff)
+        actor_loss, critic_loss = calc_PPO_loss(model, critic_model, seq, seq_attention_mask, prompt_input_ids, reward_score, logprobs, ref_logprobs, kl_ctl=0.1)
         #print (actor_loss)
         #print (critic_loss)
 
