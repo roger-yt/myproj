@@ -196,11 +196,6 @@ PROMPT_TEMPLATES = {
         "{output}",
         "<|eot_id|>",
     ),
-    "llama-3.1-8b-it":(
-        "<|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 26 Jul 2024\n\n<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        "{output}",
-        "<|eot_id|>"
-    ),
     "gemma-1.1-7b-it":(
         "<bos><start_of_turn>user\n{input}<end_of_turn>\n<start_of_turn>model\n",
         "{output}",
