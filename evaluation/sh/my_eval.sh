@@ -10,7 +10,7 @@ NUM_TEST_SAMPLE=-1
 # English open datasets
 DATA_NAME=$3
 TOKENIZERS_PARALLELISM=false \
-python -u math_eval.py \
+python -u evaluation/math_eval.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
     --data_name ${DATA_NAME} \
     --output_dir ${OUTPUT_DIR} \
