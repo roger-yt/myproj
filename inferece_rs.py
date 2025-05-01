@@ -1,16 +1,12 @@
 from datasets import load_dataset
 from vllm import LLM, SamplingParams
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, get_scheduler
-from peft import LoraConfig, TaskType, get_peft_model
+from transformers import AutoTokenizer
 import multiprocessing
 import json, os, re
 from datasets import Dataset
-import task_configs
-from task_configs import task_config_check, task_data_set
+from task_configs import task_config_check, task_data_set, get_stoppings
 import argparse
 import torch
-from run_ppo import MyDataCollatorWithPadding
-from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run multi-GPU inference on questions and answers.")
@@ -27,188 +23,146 @@ def parse_args():
         help="The path of output dataset.",
     )
     parser.add_argument(
-        "--sft_data_type",
+        "--prompt_path",
         type=str,
-        required=True,
-        help="zgt_raw / zq_raw / zgt_filter / zq_filter",
+        default="prompts/math_prompt.txt",
+        help= "path to get the cot prompt",
     )
     parser.add_argument(
         "--task_type",
         type=str,
-        default="math_gsm",
+        default="math_metamath",
         help= "math or code",
     )
     parser.add_argument(
-        "--model_max_length",
+        "--dataset_fraction",
+        type=str
+    )
+    parser.add_argument(
+        "--max_length",
         type=int,
         default=512
     )
-    parser.add_argument("--batch_size", type=int, default=2)
-    parser.add_argument("--train_step", type=int, default=999999)
-    parser.add_argument("--learning_rate", type=float, default=5e-5)
-    parser.add_argument("--save_prefix", type=str, required=True)
-    parser.add_argument("--with_template", action='store_true')
+    parser.add_argument(
+        "--temp",
+        type=float
+    )
+    parser.add_argument(
+        "--gen_nums",
+        type=int
+    )
+    parser.add_argument(
+        "--mode",
+        type=str
+    )
     return parser.parse_args()
 
 
-def main(args):
-    print("learning_rate=", args.learning_rate)
-    DEVICE = "cuda:0"
-    print ("Loading %s"%args.dataset_path)
-    train_dataset = load_dataset(args.dataset_path, split="train")
-    print ("Loaded")
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path) #AutoTokenizer
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.model_max_length = args.model_max_length
+NUM_GPUS = torch.cuda.device_count()
+print("NUM_GPUS:", NUM_GPUS)
+GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+GPUS = [int(gpu_id) for gpu_id in GPUS.split(",")]
+print("GPUS:", GPUS)
+split_list = lambda l, n: [l[i * len(l) // n: (i + 1) * len(l) // n] for i in range(n)]
+def run_inference_one_gpu(gpu_id, question_list, answer_list, answer_num_list):
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    #os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["CUDA_VISIBLE_DEVICES"].split(",")[gpu_id]
+    return generate_rational(question_list, answer_list, answer_num_list)
 
-    column_names = list(train_dataset.features)
-    task_config = task_config_check(args.task_type)
-    train_dataset = train_dataset.map(task_config.sft_new_tokenize(tokenizer), num_proc=16)
-    print("train_dataset[0]:", train_dataset[0])
-
-    # if args.with_template:
-    #     print("Using template")
-    #     def add_template(sample):
-    #         message = [{"role":"user", "content":sample['question']}]
-    #         new_question = tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True)
-    #         sample['question'] = new_question
-    #         return sample
-    #     train_dataset = train_dataset.map(add_template, num_proc=16)
-
-
-    if args.sft_data_type == 'zgt_raw':
-        def zgt_raw_filter(sample):
-            tokenized_q = tokenizer(sample['question'], truncation=True)
-            split_ans = sample['answer'].split('\n#### ')
-            assert len(split_ans) == 2, sample['answer']
-            new_ans = split_ans[0]+'\nThe answer is %s.'%split_ans[1]
-            tokenized_a = tokenizer(new_ans, truncation=True)
-            sample["input_ids_q"] = tokenized_q["input_ids"]
-            sample["attention_mask_q"] = tokenized_q["attention_mask"]
-            sample["input_ids_a"] = tokenized_a["input_ids"][1:]
-            sample["attention_mask_a"] = tokenized_a["attention_mask"][1:]
-            return sample
-        train_dataset = train_dataset.map(zgt_raw_filter, remove_columns=column_names, num_proc=16)
-    elif args.sft_data_type == 'zq_raw':
-        def zq_raw_filter(sample):
-            tokenized_q = tokenizer(sample['question'], truncation=True)
-            tokenized_a = tokenizer(sample['rational_answer'], truncation=True)
-            sample["input_ids_q"] = tokenized_q["input_ids"]
-            sample["attention_mask_q"] = tokenized_q["attention_mask"]
-            sample["input_ids_a"] = tokenized_a["input_ids"][1:]
-            sample["attention_mask_a"] = tokenized_a["attention_mask"][1:]
-            return sample
-        train_dataset = train_dataset.map(zq_raw_filter, remove_columns=column_names, num_proc=16)
-    elif args.sft_data_type == 'zgt_filter':
-        def zfilter(sample):
-            split_ans = sample['answer'].split('\n#### ')
-            assert len(split_ans) == 2, sample['answer']
-            gt_str = split_ans[1]
-            split_q = sample['rational_answer'].split('The answer is')
-            assert len(split_q) >= 2, sample['rational_answer']
-            q_reasoning = ' '.join(split_q[:-1])
-            return gt_str in q_reasoning
-        print ("Before:", len(train_dataset))
-        train_dataset = train_dataset.filter(zfilter)
-        print ("After:", len(train_dataset))
-        def zgt_raw_filter(sample):
-            tokenized_q = tokenizer(sample['question'], truncation=True)
-            split_ans = sample['answer'].split('\n#### ')
-            assert len(split_ans) == 2, sample['answer']
-            new_ans = split_ans[0]+'\nThe answer is %s.'%split_ans[1]
-            tokenized_a = tokenizer(new_ans, truncation=True)
-            sample["input_ids_q"] = tokenized_q["input_ids"]
-            sample["attention_mask_q"] = tokenized_q["attention_mask"]
-            sample["input_ids_a"] = tokenized_a["input_ids"][1:]
-            sample["attention_mask_a"] = tokenized_a["attention_mask"][1:]
-            return sample
-        train_dataset = train_dataset.map(zgt_raw_filter, remove_columns=column_names, num_proc=16)
-    elif args.sft_data_type == 'zq_filter':
-        def zfilter(sample):
-            split_ans = sample['answer'].split('\n#### ')
-            assert len(split_ans) == 2, sample['answer']
-            gt_str = split_ans[1]
-            split_q = sample['rational_answer'].split('The answer is')
-            assert len(split_q) >= 2, sample['rational_answer']
-            q_reasoning = ' '.join(split_q[:-1])
-            return gt_str in q_reasoning
-        print ("Before:", len(train_dataset))
-        train_dataset = train_dataset.filter(zfilter)
-        print ("After:", len(train_dataset))
-        def zq_raw_filter(sample):
-            tokenized_q = tokenizer(sample['question'], truncation=True)
-            tokenized_a = tokenizer(sample['rational_answer'], truncation=True)
-            sample["input_ids_q"] = tokenized_q["input_ids"]
-            sample["attention_mask_q"] = tokenized_q["attention_mask"]
-            sample["input_ids_a"] = tokenized_a["input_ids"][1:]
-            sample["attention_mask_a"] = tokenized_a["attention_mask"][1:]
-            return sample
-        train_dataset = train_dataset.map(zq_raw_filter, remove_columns=column_names, num_proc=16)
-    else:
-        raise NotImplementedError()
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=MyDataCollatorWithPadding(tokenizer=tokenizer, padding=True))
-    train_steps = min(args.train_step, len(train_dataloader))
-
-    model_config = AutoConfig.from_pretrained(args.model_path)
-    print (model_config)
-    for key in ('dropout', 'attention_dropout', 'hidden_dropout', 'activation_dropout'):
-        if hasattr(model_config, key):
-            setattr(model_config, key, 0.0)
-    model = AutoModelForCausalLM.from_pretrained(args.model_path, config=model_config, torch_dtype=torch.bfloat16, use_flash_attention_2=False).to(DEVICE).train()
-    lora_config = LoraConfig(
-        r=32,
-        lora_alpha=128,
-        target_modules=["q_proj", "v_proj"],
-        task_type=TaskType.CAUSAL_LM,
-        lora_dropout=0.0,
-        bias="none",
-    )
-    model.enable_input_require_grads()
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0, betas=(0.9, 0.95))
-    scheduler = get_scheduler(name='cosine', optimizer=optimizer, num_warmup_steps=min(100,0.1*train_steps), num_training_steps=train_steps)
+def run_inference_multi_gpu(questions, answers):
+    split_questions = split_list(questions, NUM_GPUS)
+    split_answers = split_list(answers, NUM_GPUS)
+    split_answer_nums = split_list(answer_nums, NUM_GPUS)
+    inputs = [(i+GPUS[0], p, split_answers[i], split_answer_nums[i]) for i, p in enumerate(split_questions)]
+    with multiprocessing.Pool(processes=NUM_GPUS) as pool:
+        results = pool.starmap(run_inference_one_gpu, inputs)
+    outputs = []
+    for result in results:
+        outputs.extend(result)
+    return outputs
 
 
-    model.train()
-    for step, batch in tqdm(enumerate(train_dataloader), total=train_steps):
-        if step >= train_steps:
-            break
 
-        prompt_input_ids = batch["input_ids_q_l"].to(DEVICE)
-        prompt_attention_mask = batch["attention_mask_q_l"].to(DEVICE)
-        prompt_length = prompt_input_ids.shape[1]
-        answer_input_ids = batch["input_ids_a_r"].to(DEVICE)
-        answer_attention_mask = batch["attention_mask_a_r"].to(DEVICE)
-
-        input_ids = torch.cat([prompt_input_ids, answer_input_ids],1)
-        attention_mask = torch.cat([prompt_attention_mask, answer_attention_mask],1)
-        labels = input_ids.clone()
-        labels[:,:prompt_length] = -100
-        #print ("============")
-        #print ("============")
-        #print (tokenizer.decode(input_ids[0][attention_mask[0]!=0]))
-        #print (tokenizer.decode(input_ids[0][labels[0]!=-100]))
-
-        output = model.forward(input_ids, attention_mask, labels=labels)
-        loss = output.loss
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-        if step % 50 == 0:
-            print ("Step: %d, loss: %.4f"%(step,loss.item()))
-    model.eval()
-
-    save_path = args.save_prefix + '_' + args.sft_data_type
-    if args.with_template:
-        save_path = save_path + '_withtemplate'
-    model = model.merge_and_unload()
-    model.save_pretrained(save_path, from_pt=True)
-    tokenizer.save_pretrained(save_path)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    model_name = args.model_path
+    # print("model_name:", model_name)
+    task_config = task_config_check(args.task_type)
+    dataset_fraction = args.dataset_fraction
+    task_config = task_config_check(args.task_type)
+    train_path, dataset_ = task_data_set(args.task_type)
+    if args.task_type.split("_")[-1]=="gsm":
+        data_name = "gsm8k"  
+    if args.task_type.split("_")[-1]=="math":
+        data_name = "math"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    stop_strings, stop_tokens = get_stoppings(model_name, tokenizer)
+    print(stop_strings)
+    print(stop_tokens)
+    _, dataset_ = task_data_set(args.task_type+dataset_fraction)
+    if args.mode=="box":
+        inference_tokenize = task_config.inference_box_tokenize
+    elif args.mode=="ans":
+        inference_tokenize = task_config.inference_ans_tokenize
+    dataset_ = dataset_.map(inference_tokenize(tokenizer), num_proc=16)
+    # dataset_ = dataset_.select(range(10))
+    questions = dataset_["template_question"]
+    answers = dataset_["answer_text"]
+    answer_nums = dataset_["answer_num"]
+    sampling_params = SamplingParams(
+        temperature=args.temp,
+        top_p=1.0,
+        top_k=-1,
+        # seed=42,
+        max_tokens=args.max_length,
+        min_tokens=1,
+        n=1,
+        # frequency_penalty=1.0,
+        stop=task_config.stop_str_gen_z + stop_strings,
+    )
+    from utils import extract_answer_box, extract_answer_ans
+    if args.mode=="box":
+        extract_answer = extract_answer_box
+    elif args.mode=="ans":
+        extract_answer = extract_answer_ans
+
+    def generate_rational(few_shot_questions, answers, answer_nums):
+        llm = LLM(model=model_name, tokenizer=model_name, dtype="bfloat16", seed=42, gpu_memory_utilization=0.9)
+        rationals = []
+        for i in range(args.gen_nums):
+            rational = llm.generate(few_shot_questions, sampling_params, use_tqdm=True)
+            rationals.append(rational)
+        # print("rational:", rational)
+        rational_answer = []
+        for i, answer_text in enumerate(answers):
+            # print("answer_text:", answer_text)
+            for rational in rationals:
+                rational_text = rational[i].outputs[0].text
+                lab_ans = answer_nums[i]
+                extract_ans = extract_answer(rational_text, data_name)
+                print("extract_ans:", extract_ans)
+                print("lab_ans:", lab_ans)
+                acc = (extract_ans == lab_ans)
+                print("acc:", acc)
+                if acc:
+                    break
+            rational_answer.append({"rational": rational_text, "answer": answer_text, "answer_num": lab_ans, "rational_answer": rational_text + answer_text, "acc": acc})
+        return rational_answer
+
+    num_train_data = len(dataset_)
+    gathered_data = []
+    print("Start inference")
+    rational_answer = run_inference_multi_gpu(questions, answers)
+    print("Inference done")
+    for i in range(num_train_data):
+        # print(rational_answer[i])
+        if rational_answer[i]["acc"]:
+            tmp_data = {"question": dataset_[i][task_config.x_colname], "answer": dataset_[i][task_config.y_colname],
+                        "rational_answer": rational_answer[i]["rational_answer"]}
+            gathered_data.append(tmp_data)
+    print("len(gathered_data):", len(gathered_data))
+    print("gathered_data[0]:", gathered_data[0])
+    dataset = Dataset.from_list(gathered_data)
+    dataset.push_to_hub(args.dataset_path, private=False)
