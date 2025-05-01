@@ -196,17 +196,17 @@ PROMPT_TEMPLATES = {
         "{output}",
         "<|eot_id|>",
     ),
-    "gemma-1.1-7b-it":(
+    "gemma-it":(
         "<bos><start_of_turn>user\n{input}<end_of_turn>\n<start_of_turn>model\n",
         "{output}",
         "<end_of_turn>"
     ),
-    "gemma-1.1-7b-it_box":(
+    "gemma-it_box":(
         "<bos><start_of_turn>user\nPlease reason step by step, and put your final answer within \\boxed{{}}. {input}<end_of_turn>\n<start_of_turn>model\n",
         "{output}",
         "<end_of_turn>"
     ),
-    "gemma-1.1-7b-it_answer":(
+    "gemma-it_answer":(
         "<bos><start_of_turn>user\nPlease reason step by step, and put your final answer after \"The answer is \". {input}<end_of_turn>\n<start_of_turn>model\n",
         "{output}",
         "<end_of_turn>"
