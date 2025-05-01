@@ -369,70 +369,9 @@ def strip_string(string, skip_unit=False):
 
     return string
 
-def extract_answer(pred_str, data_name, use_last_number=True):
+
+def extract_answer_box(pred_str, data_name, use_last_number=True):
     pred_str = pred_str.replace("\u043a\u0438", "")
-    if "final answer is $" in pred_str and "$. I hope" in pred_str:
-        # minerva_math
-        tmp = pred_str.split("final answer is $", 1)[1]
-        pred = tmp.split("$. I hope", 1)[0].strip()
-    elif "boxed" in pred_str:
-        ans = pred_str.split("boxed")[-1]
-        if len(ans) == 0:
-            return ""
-        elif ans[0] == "{":
-            stack = 1
-            a = ""
-            for c in ans[1:]:
-                if c == "{":
-                    stack += 1
-                    a += c
-                elif c == "}":
-                    stack -= 1
-                    if stack == 0:
-                        break
-                    a += c
-                else:
-                    a += c
-        else:
-            a = ans.split("$")[0].strip()
-        pred = a
-    elif "he answer is" in pred_str:
-        pred = pred_str.split("he answer is")[-1].strip()
-    elif "final answer is" in pred_str:
-        pred = pred_str.split("final answer is")[-1].strip()
-    elif "答案是" in pred_str:
-        # Handle Chinese few-shot multiple choice problem answer extraction
-        pred = pred_str.split("答案是")[1].strip().split("\n\n")[0].strip()
-    else:  # use the last number
-        if use_last_number:
-            pattern = "-?\d*\.?\d+"
-            pred = re.findall(pattern, pred_str.replace(",", ""))
-            if len(pred) >= 1:
-                pred = pred[-1]
-            else:
-                pred = ""
-        else:
-            pred = ""
-
-    # multiple line
-    # pred = pred.split("\n")[0]
-    pred = re.sub(r"\n\s*", "", pred)
-    if pred != "" and pred[0] == ":":
-        pred = pred[1:]
-    if pred != "" and pred[-1] == ".":
-        pred = pred[:-1]
-    if pred != "" and pred[-1] == "/":
-        pred = pred[:-1]
-    pred = strip_string(pred, skip_unit=data_name in ["carp_en", "minerva_math"])
-    return pred
-
-
-def extract_answer_new(pred_str, data_name, use_last_number=True):
-    pred_str = pred_str.replace("\u043a\u0438", "")
-    # if "final answer is $" in pred_str and "$. I hope" in pred_str:
-    #     # minerva_math
-    #     tmp = pred_str.split("final answer is $", 1)[1]
-    #     pred = tmp.split("$. I hope", 1)[0].strip()
     if "boxed" in pred_str:
         ans = pred_str.split("boxed")[-1]
         if len(ans) == 0:
@@ -454,149 +393,17 @@ def extract_answer_new(pred_str, data_name, use_last_number=True):
         else:
             a = ans.split("$")[0].strip()
         pred = a
-    # elif "he answer is" in pred_str:
-    #     pred = pred_str.split("he answer is")[-1].strip()
-    # elif "final answer is" in pred_str:
-    #     pred = pred_str.split("final answer is")[-1].strip()
-    # elif "答案是" in pred_str:
-    #     # Handle Chinese few-shot multiple choice problem answer extraction
-    #     pred = pred_str.split("答案是")[1].strip().split("\n\n")[0].strip()
-    else:  # use the last number
-        pred = ""
-        # if use_last_number:
-        #     pattern = "-?\d*\.?\d+"
-        #     pred = re.findall(pattern, pred_str.replace(",", ""))
-        #     if len(pred) >= 1:
-        #         pred = pred[-1]
-        #     else:
-        #         pred = ""
-        # else:
-        #     pred = ""
-
-    # pred = re.sub(r"\n\s*", "", pred)
-    # if pred != "" and pred[0] == ":":
-    #     pred = pred[1:]
-    # if pred != "" and pred[-1] == ".":
-    #     pred = pred[:-1]
-    # if pred != "" and pred[-1] == "/":
-    #     pred = pred[:-1]
-    # pred = strip_string(pred, skip_unit=data_name in ["carp_en", "minerva_math"])
-    return pred
-
-def extract_answer_newb(pred_str, data_name, use_last_number=True):
-    pred_str = pred_str.replace("\u043a\u0438", "")
-    # if "final answer is $" in pred_str and "$. I hope" in pred_str:
-    #     # minerva_math
-    #     tmp = pred_str.split("final answer is $", 1)[1]
-    #     pred = tmp.split("$. I hope", 1)[0].strip()
-    # elif "boxed" in pred_str:
-    #     ans = pred_str.split("boxed")[-1]
-    #     if len(ans) == 0:
-    #         return ""
-    #     elif ans[0] == "{":
-    #         stack = 1
-    #         a = ""
-    #         for c in ans[1:]:
-    #             if c == "{":
-    #                 stack += 1
-    #                 a += c
-    #             elif c == "}":
-    #                 stack -= 1
-    #                 if stack == 0:
-    #                     break
-    #                 a += c
-    #             else:
-    #                 a += c
-    #     else:
-    #         a = ans.split("$")[0].strip()
-    #     pred = a
-    if "he answer is" in pred_str:
-        pred = pred_str.split("he answer is")[-1].strip()
-    # elif "final answer is" in pred_str:
-    #     pred = pred_str.split("final answer is")[-1].strip()
-    # elif "答案是" in pred_str:
-    #     # Handle Chinese few-shot multiple choice problem answer extraction
-    #     pred = pred_str.split("答案是")[1].strip().split("\n\n")[0].strip()
     else:
         pred = ""
-    # else:  # use the last number
-    #     pred = ""
-    #     if use_last_number:
-    #         pattern = "-?\d*\.?\d+"
-    #         pred = re.findall(pattern, pred_str.replace(",", ""))
-    #         if len(pred) >= 1:
-    #             pred = pred[-1]
-    #         else:
-    #             pred = ""
-    #     else:
-    #         pred = ""
 
-    # pred = re.sub(r"\n\s*", "", pred)
-    # if pred != "" and pred[0] == ":":
-    #     pred = pred[1:]
-    # if pred != "" and pred[-1] == ".":
-    #     pred = pred[:-1]
-    # if pred != "" and pred[-1] == "/":
-    #     pred = pred[:-1]
-    # pred = strip_string(pred, skip_unit=data_name in ["carp_en", "minerva_math"])
     return pred
 
-def extract_answer_myans(pred_str, data_name, use_last_number=True):
+def extract_answer_ans(pred_str, data_name, use_last_number=True):
     pred_str = pred_str.replace("\u043a\u0438", "")
-    if "final answer is $" in pred_str and "$. I hope" in pred_str:
-        # minerva_math
-        tmp = pred_str.split("final answer is $", 1)[1]
-        pred = tmp.split("$. I hope", 1)[0].strip()
-    # elif "boxed" in pred_str:
-    #     ans = pred_str.split("boxed")[-1]
-    #     if len(ans) == 0:
-    #         return ""
-    #     elif ans[0] == "{":
-    #         stack = 1
-    #         a = ""
-    #         for c in ans[1:]:
-    #             if c == "{":
-    #                 stack += 1
-    #                 a += c
-    #             elif c == "}":
-    #                 stack -= 1
-    #                 if stack == 0:
-    #                     break
-    #                 a += c
-    #             else:
-    #                 a += c
-    #     else:
-    #         a = ans.split("$")[0].strip()
-    #     pred = a
-    elif "he answer is" in pred_str:
+    if "he answer is" in pred_str:
         pred = pred_str.split("he answer is")[-1].strip()
-    elif "final answer is" in pred_str:
-        pred = pred_str.split("final answer is")[-1].strip()
-    elif "答案是" in pred_str:
-        # Handle Chinese few-shot multiple choice problem answer extraction
-        pred = pred_str.split("答案是")[1].strip().split("\n\n")[0].strip()
-    # else:
-    #     pred = ""
-    else:  # use the last number
+    else:
         pred = ""
-        if use_last_number:
-            pattern = "-?\d*\.?\d+"
-            pred = re.findall(pattern, pred_str.replace(",", ""))
-            if len(pred) >= 1:
-                pred = pred[-1]
-            else:
-                pred = ""
-        else:
-            pred = ""
-
-    # pred = re.sub(r"\n\s*", "", pred)
-    # if pred != "" and pred[0] == ":":
-    #     pred = pred[1:]
-    # if pred != "" and pred[-1] == ".":
-    #     pred = pred[:-1]
-    # if pred != "" and pred[-1] == "/":
-    #     pred = pred[:-1]
-    # pred = strip_string(pred, skip_unit=data_name in ["carp_en", "minerva_math"])
     return pred
 
 import multiprocessing
@@ -614,83 +421,6 @@ def is_digit(s):
         return True
     except ValueError:
         return False
-
-def math_equal(prediction: Union[bool, float, str],
-                reference: Union[float, str],
-                include_percentage: bool = True,
-                is_close: bool = True,
-                timeout: bool = False,
-                ) -> bool:
-    """
-    Exact match of math if and only if:
-    1. numerical equal: both can convert to float and are equal
-    2. symbolic equal: both can convert to sympy expression and are equal
-    """
-    try: # 1. numerical equal
-        if is_digit(prediction) and is_digit(reference):
-            prediction = float(str(prediction).replace(",", ""))
-            reference = float(str(reference).replace(",", ""))
-            # number questions
-            if include_percentage:
-                gt_result = [reference / 100, reference, reference * 100]
-            else:
-                gt_result = [reference]
-            for item in gt_result:
-                try:
-                    if is_close:
-                        if isclose(item, prediction, rel_tol=1e-4):
-                            return True
-                    else:
-                        if item == prediction:
-                            return True
-                except Exception:
-                    continue
-            return False
-    except:
-        pass
-
-    if not prediction and prediction not in [0, False]:
-        return False
-
-    # 2. symbolic equal
-    reference = str(reference).strip()
-    prediction = str(prediction).strip()
-
-    ## deal with [], (), {}
-    pred_str, ref_str = prediction, reference
-    if (prediction.startswith("[") and prediction.endswith("]") and not reference.startswith("(")) or \
-        (prediction.startswith("(") and prediction.endswith(")") and not reference.startswith("[")):
-        pred_str = pred_str.strip("[]()")
-        ref_str = ref_str.strip("[]()")
-    for s in ['{', "}", "(", ")"]:
-        ref_str = ref_str.replace(s, "")
-        pred_str = pred_str.replace(s, "")
-    if pred_str == ref_str:
-        return True
-
-    ## [a, b] vs. [c, d], return a==c and b==d
-    if (prediction.startswith("[") and prediction.endswith("]")) and (reference.startswith("[") and reference.endswith("]")) or \
-        (prediction.startswith("(") and prediction.endswith(")")) and (reference.startswith("(") and reference.endswith(")")):
-        pred_parts = prediction[1:-1].split(",")
-        ref_parts = reference[1:-1].split(",")
-        if len(pred_parts) == len(ref_parts):
-            if all([math_equal(pred_parts[i], ref_parts[i], include_percentage, is_close) for i in range(len(pred_parts))]):
-                return True
-
-    # symbolic equal with sympy
-    if timeout:
-        if call_with_timeout(symbolic_equal_process, prediction, reference):
-            return True
-    else:
-        if symbolic_equal(prediction, reference):
-            return True
-
-    return False
-
-
-def math_equal_process(param):
-    return math_equal(param[-2], param[-1])
-
 
 def symbolic_equal(a, b):
     def _parse(s):

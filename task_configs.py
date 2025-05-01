@@ -69,7 +69,7 @@ class Config_Math_GSM(Config_Math):
             sample["hint_template_question"] = hint_q
             return sample
         return tokenize
-    def inference_new_tokenize(self, tokenizer):
+    def inference_box_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
             sample_x = instruction + " " + sample['question']
@@ -94,7 +94,7 @@ class Config_Math_GSM(Config_Math):
             sample["question"] = q
             return sample
         return tokenize
-    def sft_new_tokenize(self, tokenizer):
+    def sft_box_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
             sample_x = instruction + " " + sample['question']
@@ -192,7 +192,8 @@ class Config_Math_Math(Config_Math):
             sample["answer_num"] = answer_text
             return sample
         return tokenize
-    def inference_new_tokenize(self, tokenizer):
+
+    def inference_box_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
             sample_x = instruction + " " + sample['problem']
@@ -208,25 +209,9 @@ class Config_Math_Math(Config_Math):
             return sample
         return tokenize
     
-    def inference_newb_tokenize(self, tokenizer):
+    def inference_ans_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction = "Please reason step by step, and put your final answer after \"The answer is \"."
-            sample_x = instruction + " " + sample['problem']
-            input = [{"role": "user", "content": sample_x}]
-            q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
-            answer_text = self.extract_boxed_content(sample['solution'])
-            answer = f"The answer is {answer_text}."
-            input_answer = [{"role": "user", "content": sample_x}, {"role": "assistant", "content": answer}]
-            answer = tokenizer.apply_chat_template(input_answer, tokenize=False).replace(q, '')
-            sample["template_question"] = q
-            sample["answer_text"] = answer
-            sample["answer_num"] = answer_text
-            return sample
-        return tokenize
-    
-    def inference_myans_tokenize(self, tokenizer):
-        def tokenize(sample):
-            instruction = "Please show your reasoning step by step. In the end, clearly state your final answer."
             sample_x = instruction + " " + sample['problem']
             input = [{"role": "user", "content": sample_x}]
             q = tokenizer.apply_chat_template(input, tokenize=False, add_generation_prompt=True)
@@ -248,7 +233,7 @@ class Config_Math_Math(Config_Math):
             return sample
         return tokenize
     
-    def sft_new_tokenize(self, tokenizer):
+    def sft_box_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction = "Please reason step by step, and put your final answer within \\boxed{{}}."
             sample_x = instruction + " " + sample['question']
@@ -258,7 +243,7 @@ class Config_Math_Math(Config_Math):
             return sample
         return tokenize
     
-    def sft_newb_tokenize(self, tokenizer):
+    def sft_ans_tokenize(self, tokenizer):
         def tokenize(sample):
             instruction =  "Please reason step by step, and put your final answer after \"The answer is \"."
             sample_x = instruction + " " + sample['question']
@@ -355,8 +340,6 @@ class Config_Code_Opencoder_edu(Config_Code):
 def task_config_check(task_name):
     if task_name.startswith("math_gsm"):
         return Config_Math_GSM()
-    elif task_name.startswith("math_metamath"):
-        return Config_Math_MetaMath()
     elif task_name.startswith("math_math"):
         return Config_Math_Math()
     elif task_name == "code_opencoder_edu":
