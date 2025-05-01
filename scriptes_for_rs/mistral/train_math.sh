@@ -2,6 +2,8 @@ conda env create -f environment.yaml
 eval "$(conda shell.bash hook)"
 conda activate yy
 
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+
 iter_num=1
 
 export HF_TOKEN=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
