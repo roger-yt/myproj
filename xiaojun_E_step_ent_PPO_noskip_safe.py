@@ -265,9 +265,10 @@ def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_scor
             print("i=", i, "start=", start, "ends[i]=", ends[i])
             print("len(old_rewards[i,:])=", len(old_rewards[i,:]))
             print("len(old_rewards[i,start:ends[i]])=", len(old_rewards[i,start:ends[i]]))
-            old_rewards[i,start:ends[i]][-1] += reward_clip[i].to(old_rewards.device)
-            old_rewards[i,ends[i]:] = 0
-            old_values[i,ends[i]:] = 0
+            if len(old_rewards[i,start:ends[i]]) > 0:
+                old_rewards[i,start:ends[i]][-1] += reward_clip[i].to(old_rewards.device)
+                old_rewards[i,ends[i]:] = 0
+                old_values[i,ends[i]:] = 0
         lastgaelam = 0
         advantages_reversed = []
         length = old_rewards.size()[-1]
