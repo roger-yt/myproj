@@ -127,6 +127,7 @@ class ScriptArguments:
     save_strategy: Optional[str] = field(default="steps")
     wandb_project: Optional[str] = field(default="E_step_ent")
     upload_to_hub: Optional[bool] = field(default=True)
+    noskip: Optional[bool] = field(default=True)
 
 def padding_func(ft_ls, padding_side, pad_token_id, return_tensors):
     max_len = max(len(ft) for ft in ft_ls)
@@ -171,7 +172,40 @@ class MyDataCollatorWithPadding:
         }
         return batch
 
-def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, xz_mask, y_rightpad, y_mask):
+def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, y_rightpad):
+    loss_fn = torch.nn.CrossEntropyLoss()
+    assert len(xz_leftpad) == len(y_rightpad)
+    reward = []
+    for one_xz, one_y in zip(xz_leftpad, y_rightpad):
+        # TODO: calculating without batch for convenience; can batchify to accelerate
+        xz_txt = tokenizer.decode(one_xz, skip_special_tokens=True)
+        y_txt = tokenizer.decode(one_y, skip_special_tokens=True)
+        concat_toks = tokenizer(xz_txt+y_txt, return_tensors='pt')
+
+        #prompt_length = xz_length
+        # Designing mask: only consider the tokens after "The answer is"
+        xz_length = tokenizer(xz_txt, return_tensors='pt')['input_ids'].shape[1]
+        prompt_length = xz_length + 4
+        assert y_txt.startswith('The answer is')
+        # TODO: The length is approximate and may not be correct, so the assert below may fail... just ignoring it for now.
+        # assert tokenizer.decode(concat_toks['input_ids'][0][xz_length:prompt_length]) == 'The answer is', [tokenizer.decode(concat_toks['input_ids'][0][xz_length:prompt_length])]
+        output = ref_model.forward(concat_toks['input_ids'].to(ref_model.device), attention_mask=concat_toks['attention_mask'].to(ref_model.device))
+        if output.logits.shape[1] <= prompt_length:
+            prompt_length = output.logits.shape[1] - 1
+            
+        print("concat_toks['input_ids'].shape[1]-prompt_length=", concat_toks['input_ids'].shape[1]-prompt_length)
+        print("output.logits.shape[1]=", output.logits.shape[1])
+        print("prompt_length=", prompt_length)
+        print("xz_txt=", xz_txt)
+        print(concat_toks['input_ids'].size(), y_txt)
+        print("kept_str=", tokenizer.decode(concat_toks['input_ids'][0][prompt_length-1:]))
+        shift_logits = output.logits[:,prompt_length-1:-1].view(concat_toks['input_ids'].shape[1]-prompt_length,-1)
+        shift_labels = concat_toks['input_ids'][:,prompt_length:].view(concat_toks['input_ids'].shape[1]-prompt_length).to(ref_model.device)
+        loss = loss_fn(shift_logits, shift_labels)
+        reward.append(-loss)
+    return torch.stack(reward)
+
+def calc_reward_with_nll_nsk(ref_model, tokenizer, xz_leftpad, xz_mask, y_rightpad, y_mask):
     loss_fn = torch.nn.CrossEntropyLoss()
     assert len(xz_leftpad) == len(y_rightpad)
     reward = []
@@ -206,7 +240,6 @@ def calc_reward_with_nll(ref_model, tokenizer, xz_leftpad, xz_mask, y_rightpad, 
         loss = loss_fn(shift_logits, shift_labels)
         reward.append(-loss)
     return torch.stack(reward)
-
 
 class CriticModel(torch.nn.Module):
     def __init__(self, base_model):
@@ -246,7 +279,47 @@ def critic_loss_fn(values, old_values, returns, mask):
         torch.max(vf_loss1, vf_loss2) * mask) / mask.sum()
     return vf_loss
 
-def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_score, logprobs, ref_logprobs, kl_ctl, ent_coeff):
+def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_score, logprobs, ref_logprobs, kl_ctl=0.1):
+    rew_clip_val = 5.0
+    gamma = 1.0
+    lam = 0.95
+
+    with torch.no_grad():
+        # Calculate advantage
+        critic_model.eval()
+        old_values = critic_model.forward(seq.to(critic_model.device), attention_mask.to(critic_model.device)).to(model.device).detach()[:,:-1]
+        start = prompts.size()[-1] - 1
+        action_mask = attention_mask[:,1:]
+        ends = start + action_mask[:,start:].sum(1)+1
+
+        old_rewards = -kl_ctl * (logprobs - ref_logprobs)  # KL reg
+        reward_clip = torch.clamp(reward_score, -rew_clip_val, rew_clip_val)
+        for i in range(len(old_rewards)):
+            old_rewards[i,start:ends[i]][-1] += reward_clip[i].to(old_rewards.device)
+            old_rewards[i,ends[i]:] = 0
+            old_values[i,ends[i]:] = 0
+
+        lastgaelam = 0
+        advantages_reversed = []
+        length = old_rewards.size()[-1]
+        for t in reversed(range(start, length)):
+            nextvalues = old_values[:,t+1] if t < length-1 else 0.0
+            delta = old_rewards[:,t] + gamma * nextvalues - old_values[:,t]
+            lastgaelam = delta + gamma * lam * lastgaelam
+            advantages_reversed.append(lastgaelam)
+        advantages = torch.stack(advantages_reversed[::-1], dim=1)
+        returns = advantages + old_values[:, start:]
+        advantages = advantages.detach()
+
+    actor_prob = model(input_ids=seq, attention_mask=attention_mask, use_cache=False).logits
+    actor_log_prob = gather_log_probs(actor_prob[:,:-1,:], seq[:,1:])
+    actor_loss = actor_loss_fn(actor_log_prob[:,start:], logprobs[:,start:], advantages, action_mask[:,start:])
+    critic_model.train()
+    value = critic_model.forward(input_ids=seq.to(critic_model.device), attention_mask=attention_mask.to(critic_model.device))[:, :-1]
+    critic_loss = critic_loss_fn(value[:,start:], old_values[:,start:].to(critic_model.device), returns.to(critic_model.device), action_mask[:,start:].to(critic_model.device))
+    return actor_loss, critic_loss
+
+def calc_PPO_loss_nsk(model, critic_model, seq, attention_mask, prompts, reward_score, logprobs, ref_logprobs, kl_ctl, ent_coeff):
     rew_clip_val = 5.0
     gamma = 1.0
     lam = 0.95
@@ -308,7 +381,6 @@ def calc_PPO_loss(model, critic_model, seq, attention_mask, prompts, reward_scor
 
     return actor_loss, critic_loss
 
-
 def main(script_args):
     # get cuda_visible_devices
     cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES", "")
@@ -347,7 +419,6 @@ def main(script_args):
         os.makedirs(output_name)
 
     train_dataset = train_dataset.map(task_config.tokenize_E(tokenizer), num_proc=16)
-    print("train_dataset[0]=", train_dataset[0])
     train_steps = len(train_dataset) // (script_args.per_device_train_batch_size * script_args.gradient_accumulation_steps)
 
     model_config = AutoConfig.from_pretrained(script_args.model_name)
@@ -424,11 +495,16 @@ def main(script_args):
             seq_attention_mask[:,:prompt_length] = prompt_attention_mask
 
             # Evaluate reward and other info
-            reward_score = calc_reward_with_nll(ref_model, tokenizer, 
+            if script_args.noskip:
+                print("reward using noskip")
+                reward_score = calc_reward_with_nll_nsk(ref_model, tokenizer, 
                                                 seq.to(ref_model.device), 
                                                 seq_attention_mask.to(ref_model.device), 
                                                 answer_input_ids.to(ref_model.device),
                                                 answer_attention_mask.to(ref_model.device))
+            else:
+                print("reward unusing noskip")
+                reward_score = calc_reward_with_nll(ref_model, tokenizer, seq.to(ref_model.device), answer_input_ids.to(ref_model.device))
             print (reward_score)
             # TODO: hard-coded reward normalization here. May try other methods.
             #reward_score = (reward_score+4.5)*2
@@ -451,7 +527,12 @@ def main(script_args):
 
         # Calculate actor loss and critic loss with standard PPO
         model.train()
-        actor_loss, critic_loss = calc_PPO_loss(model, critic_model, seq, seq_attention_mask, prompt_input_ids, reward_score, logprobs, ref_logprobs, kl_ctl=0.1, ent_coeff = script_args.ent_coeff)
+        if script_args.noskip:
+            print("ppo using noskup")
+            actor_loss, critic_loss = calc_PPO_loss_nsk(model, critic_model, seq, seq_attention_mask, prompt_input_ids, reward_score, logprobs, ref_logprobs, kl_ctl=0.1, ent_coeff = script_args.ent_coeff)
+        else:
+            print("ppo unusing noskip")
+            actor_loss, critic_loss = calc_PPO_loss(model, critic_model, seq, seq_attention_mask, prompt_input_ids, reward_score, logprobs, ref_logprobs, kl_ctl=0.1)
         #print (actor_loss)
         #print (critic_loss)
 

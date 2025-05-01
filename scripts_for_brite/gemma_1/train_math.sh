@@ -36,14 +36,14 @@ for i in $(seq 1 $iter_num); do
         m_lr="1e-6"
     fi
     
-    path="./${model_name}-${task_suf}_sample_${num_samples}_nsksm_ml${max_length}"
+    path="./${model_name}-${task_suf}_sample_${num_samples}_nsk_ml${max_length}"
     mkdir $path
     e_input_model="${path}/m-iter-$((i-1))_zq_raw"
     e_model_dir="${path}/e-iter-$i"
     m_model_dir="${path}/m-iter-$i"
-    e_hub_id="${task_pre}_${task_suf}-${model_name}-e-iter-${i}_sample_${num_samples}_nsksm_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
-    m_hub_id="${task_pre}_${task_suf}-${model_name}-m-iter-${i}_sample_${num_samples}_nsksm_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
-    dataset_path="YYT-t/${task_pre}_${task_suf}-${model_name}-iter${i}_sample_${num_samples}_nsksm_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
+    e_hub_id="${task_pre}_${task_suf}-${model_name}-e-iter-${i}_sample_${num_samples}_nsk_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
+    m_hub_id="${task_pre}_${task_suf}-${model_name}-m-iter-${i}_sample_${num_samples}_nsk_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
+    dataset_path="YYT-t/${task_pre}_${task_suf}-${model_name}-iter${i}_sample_${num_samples}_nsk_ml${max_length}_mlr${m_lr}_ent${ent_coeff}"
 
     if [ "$i" -eq 1 ]; then
         e_input_model="${company}/${model_name}"
@@ -51,7 +51,7 @@ for i in $(seq 1 $iter_num); do
         echo "iteration $i"
     fi
 
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python xiaojun_E_step_ent_PPO_noskip_safe_min.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python run_ppo.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff --noskip true
     
 
     huggingface-cli upload "YYT-t/$e_hub_id" "${e_model_dir}/final_checkpoint" --token $upload_token

@@ -52,7 +52,7 @@ for i in $(seq 1 $iter_num); do
         echo "iteration $i"
     fi
 
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python xiaojun_E_step_ent_PPO.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python run_ppo.py --model_name $e_input_model --critic_model_name $critic_model_name --task_type "${task_pre}_${task_suf}${split}" --model_path $e_model_dir  --max_length $max_length --model_max_length $model_max_length --ent_coeff $ent_coeff --noskip false
     
 
     huggingface-cli upload "YYT-t/$e_hub_id" "${e_model_dir}/final_checkpoint" --token $upload_token
