@@ -55,6 +55,10 @@ def parse_args():
         "--mode",
         type=str
     )
+    parser.add_argument(
+        "--upload_token",
+        type=str
+    )
     return parser.parse_args()
 
 
@@ -165,4 +169,4 @@ if __name__ == "__main__":
     print("len(gathered_data):", len(gathered_data))
     print("gathered_data[0]:", gathered_data[0])
     dataset = Dataset.from_list(gathered_data)
-    dataset.push_to_hub(args.dataset_path, private=False)
+    dataset.push_to_hub(args.dataset_path, private=False, token=args.upload_token)
