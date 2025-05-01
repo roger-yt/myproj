@@ -14,7 +14,6 @@ export CUDA_VISIBLE_DEVICES="0,1"
 
 company="google"
 model_name="gemma-1.1-7b-it"
-critic_model_name="${company}/${model_name}"
 task_pre="math"
 task_suf="math"
 # conda init bash
