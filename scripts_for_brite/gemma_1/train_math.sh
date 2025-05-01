@@ -63,7 +63,7 @@ for i in $(seq 1 $iter_num); do
     
     CUDA_VISIBLE_DEVICES="${visible_devices}" python inference.py --model_path "${e_model_dir}/final_checkpoint" --task_type "${task_pre}_${task_suf}" --dataset_path $dataset_path --dataset_fraction $split  --max_length $max_length --upload_token $upload_token
 
-    CUDA_VISIBLE_DEVICES="${visible_devices}" python inference_xiaojun.py --model_path $e_input_model --dataset_path $dataset_path --save_prefix $m_model_dir --sft_data_type zq_raw --train_step $num_samples  --task_type  "${task_pre}_${task_suf}" --model_max_length $model_max_length --learning_rate $m_lr
+    CUDA_VISIBLE_DEVICES="${visible_devices}" python sft.py --model_path $e_input_model --dataset_path $dataset_path --save_prefix $m_model_dir --sft_data_type zq_raw --train_step $num_samples  --task_type  "${task_pre}_${task_suf}" --model_max_length $model_max_length --learning_rate $m_lr
     huggingface-cli upload "YYT-t/$m_hub_id" "${m_model_dir}_zq_raw" --token $upload_token
 
 done    

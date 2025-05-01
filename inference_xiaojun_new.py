@@ -9,7 +9,7 @@ import task_configs
 from task_configs import task_config_check, task_data_set
 import argparse
 import torch
-from xiaojun_E_step_ent_PPO import MyDataCollatorWithPadding
+from run_ppo import MyDataCollatorWithPadding
 from tqdm import tqdm
 
 def parse_args():
