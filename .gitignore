@@ -6,7 +6,7 @@ Meta-Llama-3-8B-Instruct-metamath_sample_1000_tp
 out.json
 Meta*
 Mistral*
-gemma*
+/gemma*/
 Llama*
 out.txt
 condaenv*
