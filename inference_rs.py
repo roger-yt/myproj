@@ -119,11 +119,9 @@ if __name__ == "__main__":
         temperature=args.temp,
         top_p=1.0,
         top_k=-1,
-        # seed=42,
         max_tokens=args.max_length,
         min_tokens=1,
         n=1,
-        # frequency_penalty=1.0,
         stop=task_config.stop_str_gen_z + stop_strings,
     )
     from utils import extract_answer_box, extract_answer_ans
